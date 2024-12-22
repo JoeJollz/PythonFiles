@@ -275,23 +275,3 @@ for lookback in lookback_periods:
                 
             
                 trades_book.append(averge_win_loss_0/len(long_to_close))
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-                
-            
-            
-            
-
-    
-    
-    
