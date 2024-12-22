@@ -10,6 +10,62 @@ import numpy as np
 import yfinance as yf
 import matplotlib.pyplot as plt
 from operator import itemgetter
+from collections import deque
+
+## class used later for storage of trading pairs ##
+
+class StringStorage:
+    def __init__(self, max_size=5):
+        '''
+        Parameters
+        ----------
+        max_size : INT, optional
+            The number of pairs which are traded long (as well as short). 
+            Hence the total number of open positions will be 10. 
+            The default is 5.
+
+        '''
+        # Initialize the deque with a max size
+        self.storage = deque(maxlen=max_size)
+
+    def add_strings(self, new_strings):
+        '''
+        Parameters
+        ----------
+        new_strings : LIST OR TUPLE
+            This will contain the FX pairs which are to be opened or remain open.
+
+        Returns
+        -------
+        missing_strings : SET
+            Returning the FX pairs whose position must now be closed.
+
+        '''
+        # First, check which string is missing
+        current_strings = set(self.storage)  # Convert current storage to a set
+        new_strings_set = set(new_strings)   # Convert new strings to a set
+        
+        # Identify the missing string(s) from the old set
+        missing_strings = current_strings - new_strings_set
+        
+        # If there's a string missing, replace it
+        for missing in missing_strings:
+            self.storage.remove(missing)  # Remove the missing string
+        
+        # Add the new strings (make sure to only add what's not already in the storage)
+        for new_string in new_strings:
+            if new_string not in self.storage:
+                self.storage.append(new_string)
+            
+        return missing_strings
+
+    def get_storage(self):
+        # Return the current storage
+        return list(self.storage)
+    
+## class coding finished ##
+
+
 
 currency_pairs = [
     "EUR/USD", "USD/JPY", "GBP/USD", "USD/CHF",
@@ -93,8 +149,8 @@ holding_periods = [2,3, 5, 10, 15]
 for lookback in lookback_periods:
     for holding_period in holding_periods:
         
-        long_list =[]
-        short_list =[]
+        long_pairs = StringStorage()
+        short_pairs = StringStorage()
         
         for i in np.arange(lookback, len(data)/100, holding_period):
             pct_changes = {}
@@ -105,6 +161,8 @@ for lookback in lookback_periods:
                 
                 pct_changes[pair] = pct_change
             sorted_pct_changes = sorted(pct_changes.items(), key=itemgetter(1))
+            
+            
             
                 
             
