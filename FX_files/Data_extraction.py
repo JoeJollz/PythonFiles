@@ -37,6 +37,9 @@ class StringStorage:
 
     def add_strings(self, new_strings):
         '''
+        This method is crucial and key for identifying any new pairs which must
+        now have a position open, or any old pairs which must now be closed.
+        
         Parameters
         ----------
         new_strings : LIST OR TUPLE
@@ -53,10 +56,20 @@ class StringStorage:
         new_strings_set = set(new_strings)   # Convert new strings to a set
         
         # Identify the missing string(s) from the old set
-        missing_strings = current_strings - new_strings_set
+        strings_to_close = current_strings - new_strings_set # correct
+        strings_to_open = new_strings_set - current_strings # correct
+        # print('----------------')
+        # print('new_strings', new_strings_set)
+        # print('old_strings', current_strings)
+        # print('the missing strings', missing_strings)
+        # print('----------------')
+        # print('new_strings', new_strings_set)
+        # print('old_strings', current_strings)
+        # print('the missing strings', strings_to_open)
+        
         
         # If there's a string missing, replace it
-        for missing in missing_strings:
+        for missing in strings_to_close:
             self.storage.remove(missing)  # Remove the missing string
         
         # Add the new strings (make sure to only add what's not already in the storage)
@@ -64,13 +77,87 @@ class StringStorage:
             if new_string not in self.storage:
                 self.storage.append(new_string)
             
-        return missing_strings
+        return strings_to_close, strings_to_open
 
     def get_storage(self):
         # Return the current storage
         return list(self.storage)
     
+class PositionBook:
+    def __init__(self):
+        self.positions = {} # simply create dictionary
+        
+        
+    def organise_positions(self, to_open, to_close, index, fx_data , long=True):
+        '''
+        This method is updates our position book. It will consider if the book
+        is for long positions of short position. It will consider what
+        positions will be closed and therefore caculate their relavent profit
+        or loss. It will then remove the positions from our order book, and 
+        then added the new positions which are to opened. It will store the 
+        FX_pair name as the key, with the price action at the point of opening 
+        the position being the value. 
+        
+        It will then return the average win / loss for all the positions opened
+        and closed. 
+        
+        This method must be called seperately the long positions order book, 
+        and the short positions order book. 
+
+        Parameters
+        ----------
+        to_open : SET
+            All the new positions which are to be opened.
+        to_close : SET
+            All the old positions which must be closed.
+        index : INT
+            Index representing the current time in the historical data.
+        fx_data : DICT
+            Contains all the FX pair trading candle data.
+        long : Boolean, optional
+            This will determine if the book is for the long positions or short 
+            positions. The default is True.
+
+        Returns
+        -------
+        average_win_loss : FLOAT
+            This is the average win/loss for all the positions closed 
+            for the current time step. NOTE THE 'AVERAGE' IS NOT TRUE, FURTHER 
+            WORK IS TO BE COMPLETED IN ORDER TO ACCURATELY UPDATE OUR NEW 
+            TRADING CAPITAL VALUE - THIS WILL BE DEPENDENT ON THE WEIGHTING OF
+            OUR POSITIONS AND THE NUMBER OF POSITIONS CLOSED DURING THIS TIME
+            PERIOD. 
+
+        '''
+        
+        book = self.positions
+        
+        trades = []
+        
+        for _ in to_close:
+            open_price = book[_]
+            close_price = fx_data[_]['Close'].iloc[index]
+            del book[_] # removing the FX pair from our position book
+            
+            if long == True:
+                pct_gain_loss = close_price/open_price 
+            else:
+                pct_gain_loss = open_price/close_price
+            
+            
+            trades.append(pct_gain_loss)
+        average_win_loss = sum(trades)
+        
+        for _ in to_open:
+            book[_] = fx_data[_]['Close'].iloc[index] # storing the new price of the newly opened poistion
+    
+        return average_win_loss
+        
+        
+    
 ## class coding finished ##
+
+
 
 
 
@@ -152,28 +239,52 @@ lookback_periods = [3, 5, 10, 15 ]
 holding_periods = [2,3, 5, 10, 15]
 
 
-
 for lookback in lookback_periods:
     for holding_period in holding_periods:
         
         long_pairs = StringStorage()
         short_pairs = StringStorage()
         
-        for i in np.arange(lookback, len(data)/100, holding_period):
+        long_book = PositionBook()
+        short_book = PositionBook()
+        trades_book = []
+        
+        for i in np.arange(lookback, len(data)/20, holding_period):
             pct_changes = {}
             i = int(i)
             for pair, data in fx_data.items():    
                 data = data['Close']
-                pct_change = data.iloc[i]/ data.iloc[i-lookback]
+                pct_change = data.iloc[i]/ data.iloc[i-lookback] # increase/decrease
                 
                 pct_changes[pair] = pct_change
                 
-            sorted_pct_changes = sorted(pct_changes.items(), key=itemgetter(1))
-            worst_perf = sorted_pct_changes[:5]
-            best_perf = sorted_pct_changes[(len(sorted_pct_changes)-5):]
+            sorted_pct_changes = sorted(pct_changes.items(), key=itemgetter(1)) # sort the pairs, from worst (top) to best (bottom)
             
-            long_to_close = long_pairs.add_strings(best_perf)
-            short_to_close = short_pairs.add_strings(worst_perf)
+            worst_perf = sorted_pct_changes[:5] # worst 5 performers.
+            worst_perf = [_[0] for _ in worst_perf] # extracting the first element of the tuples in the list, which corresponds to the FX pair name.
+            best_perf = sorted_pct_changes[(len(sorted_pct_changes)-5):] # top 5 performers
+            best_perf = [_[0] for _ in best_perf]
+            
+            
+            long_to_close, long_to_open = long_pairs.add_strings(best_perf)
+            short_to_close, short_to_open = short_pairs.add_strings(worst_perf)
+            
+            averge_win_loss_0 = long_book.organise_positions(long_to_open, long_to_close, i, fx_data, long=True) # call class method
+            
+            if len(long_to_close) != 0: # ensuring trades are occuring, before storing
+                
+            
+                trades_book.append(averge_win_loss_0/len(long_to_close))
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
             
             
                 
