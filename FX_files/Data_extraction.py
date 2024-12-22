@@ -3,6 +3,13 @@
 Created on Sat Dec 21 14:12:32 2024
 
 @author: jrjol
+
+This strategy aims to either trade long the best performers, and short the 
+worst performers. Alternatively, this can be changed to shorting the best performers
+and longing the worst performers. To consider this change, look specifically 
+for the variables 'long_to_close', 'short_to_close', 'long_pairs', and 
+'short_pairs', it should be quite obvious where the 'long_pair' are chosen 
+based on best performing pairs, or worst performing pairs. 
 """
 
 import pandas as pd
@@ -160,8 +167,13 @@ for lookback in lookback_periods:
                 pct_change = data.iloc[i]/ data.iloc[i-lookback]
                 
                 pct_changes[pair] = pct_change
+                
             sorted_pct_changes = sorted(pct_changes.items(), key=itemgetter(1))
+            worst_perf = sorted_pct_changes[:5]
+            best_perf = sorted_pct_changes[(len(sorted_pct_changes)-5):]
             
+            long_to_close = long_pairs.add_strings(best_perf)
+            short_to_close = short_pairs.add_strings(worst_perf)
             
             
                 
