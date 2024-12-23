@@ -83,6 +83,9 @@ class StringStorage:
         # Return the current storage
         return list(self.storage)
     
+    
+## this class is reponsible for the order book, and maintains what positions 
+# are currently open.
 class PositionBook:
     def __init__(self):
         self.positions = {} # simply create dictionary
@@ -152,6 +155,19 @@ class PositionBook:
             book[_] = fx_data[_]['Close'].iloc[index] # storing the new price of the newly opened poistion
     
         return average_win_loss
+    
+## this class is responsible for storing the trading metrics of the strategy
+
+class results:
+    def __init__(self):
+        self.results = {} # open simple dictionary
+    
+    def store_result(self, tubple_parameters, metric):
+        
+        self.results[tuple_parameteres] = metric  # input strategy parameters are stored as the key, with the metric as the value. 
+        
+        
+        
         
         
     
