@@ -158,18 +158,32 @@ class PositionBook:
     
 ## this class is responsible for storing the trading metrics of the strategy
 
-class results:
+class results_counter:
     def __init__(self):
-        self.results = {} # open simple dictionary
+        self.a = 0 # TBF, need to make a metric counter for various metrics.... !!!! 
+
+   
+class results_store:
+    def __init__(self):
+        self.results = [] # open simple list to store result information
     
-    def store_result(self, tubple_parameters, metric):
+    def store_result(self, addition):
         
-        self.results[tuple_parameteres] = metric  # input strategy parameters are stored as the key, with the metric as the value. 
+        self.results.append(addition)  # this can be used to store a tuple of input parameters, or metric input
+    
+    def organise_results(self, parameter_store):
         
+        mini = min(self.results) # minimal value of the metrics
+        maxi = max(self.results) # maximum value of metrics
         
+        mini_index = self.results.index(mini) # index of the smallest metric
+        maxi_index = self.results.index(maxi) # index of the largest metric
         
+        mini_parameter = parameter_store[mini_index] # strategy parameters corresponding to the small metric
+        maxi_parameter = parameter_store[maxi_index] # strategy parameters corresponding to the largest metric
         
-        
+        return mini, mini_parameter, maxi, maxi_parameter
+    
     
 ## class coding finished ##
 
@@ -254,6 +268,10 @@ Test a variety of lookback periods, and holding periods.
 lookback_periods = [3, 5, 10, 15 ]
 holding_periods = [2,3, 5, 10, 15]
 
+strategy_parameters = results()
+total_returns = results()
+
+
 
 for lookback in lookback_periods:
     for holding_period in holding_periods:
@@ -264,6 +282,10 @@ for lookback in lookback_periods:
         long_book = PositionBook()
         short_book = PositionBook()
         trades_book = []
+        
+        
+        
+        
         
         for i in np.arange(lookback, len(data)/20, holding_period):
             pct_changes = {}
@@ -291,3 +313,8 @@ for lookback in lookback_periods:
                 
             
                 trades_book.append(averge_win_loss_0/len(long_to_close))
+        
+        parameter_tuple = ()  # input strategy parameters, so it can be appended to the below list
+        strategy_parameters.store_result()
+        metric_one.store_result() 
+        
