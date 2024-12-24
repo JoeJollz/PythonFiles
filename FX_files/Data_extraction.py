@@ -136,6 +136,8 @@ class PositionBook:
         book = self.positions
         
         trades = []
+        w_trades = 0
+        l_trades = 0
         
         for _ in to_close:
             open_price = book[_]
@@ -147,14 +149,21 @@ class PositionBook:
             else:
                 pct_gain_loss = open_price/close_price
             
-            
             trades.append(pct_gain_loss)
-        average_win_loss = sum(trades)
+            
+            if pct_gain_loss>0:
+                w_trades+=1
+            elif pct_gain_loss<0:
+                l_trades+=1
+            
+            
+        trade_counter = len(to_close)
         
         for _ in to_open:
             book[_] = fx_data[_]['Close'].iloc[index] # storing the new price of the newly opened poistion
+            
     
-        return average_win_loss
+        return trades, trade_counter, w_trades, l_trades
     
 ## this class is responsible for storing the trading metrics of the strategy
 
@@ -169,20 +178,44 @@ class results_store:
     
     def store_result(self, addition):
         
-        self.results.append(addition)  # this can be used to store a tuple of input parameters, or metric input
+        for _ in addition:
+            self.results.append(_)
+        
+        #self.results.append(addition)  # this can be used to store a tuple of input parameters, or metric input
     
-    def organise_results(self, parameter_store):
+    def organise_trade_results(self):
         
-        mini = min(self.results) # minimal value of the metrics
-        maxi = max(self.results) # maximum value of metrics
+        # mini = min(self.results) # minimal value of the metrics
+        # maxi = max(self.results) # maximum value of metrics
         
-        mini_index = self.results.index(mini) # index of the smallest metric
-        maxi_index = self.results.index(maxi) # index of the largest metric
+        # mini_index = self.results.index(mini) # index of the smallest metric
+        # maxi_index = self.results.index(maxi) # index of the largest metric
         
-        mini_parameter = parameter_store[mini_index] # strategy parameters corresponding to the small metric
-        maxi_parameter = parameter_store[maxi_index] # strategy parameters corresponding to the largest metric
+       # mini_parameter = parameter_store[mini_index] # strategy parameters corresponding to the small metric
+       # maxi_parameter = parameter_store[maxi_index] # strategy parameters corresponding to the largest metri
+       
+       
+        w_trades = 0
+        l_trades = 0
+        eq = 1
+       
+        for _ in self.results:
+            eq *= _
+            
+            if _ >1:
+                w_trades +=1
+            elif _<1:
+                l_trades +=1
         
-        return mini, mini_parameter, maxi, maxi_parameter
+        n_trades = w_trades + l_trades
+        
+        win_rate = w_trades/n_trades*100
+        
+        avg_rt = (eq-1)/n_trades
+            
+        return eq, avg_rt, w_trades, l_trades, n_trades, win_rate
+    
+
     
     
 ## class coding finished ##
@@ -268,10 +301,10 @@ Test a variety of lookback periods, and holding periods.
 lookback_periods = [3, 5, 10, 15 ]
 holding_periods = [2,3, 5, 10, 15]
 
-strategy_parameters = results()
-total_returns = results()
+# strategy_parameters = results()
+# total_returns = results()
 
-
+min_rows = min(df.shape[0] for df in fx_data.values()) # identify the maximum size of loop
 
 for lookback in lookback_periods:
     for holding_period in holding_periods:
@@ -281,13 +314,10 @@ for lookback in lookback_periods:
         
         long_book = PositionBook()
         short_book = PositionBook()
-        trades_book = []
+        trades_book_l = results_store()
+        trades_book_s = results_store()
         
-        
-        
-        
-        
-        for i in np.arange(lookback, len(data)/20, holding_period):
+        for i in np.arange(lookback, min_rows, holding_period):
             pct_changes = {}
             i = int(i)
             for pair, data in fx_data.items():    
@@ -307,14 +337,40 @@ for lookback in lookback_periods:
             long_to_close, long_to_open = long_pairs.add_strings(best_perf)
             short_to_close, short_to_open = short_pairs.add_strings(worst_perf)
             
-            averge_win_loss_0 = long_book.organise_positions(long_to_open, long_to_close, i, fx_data, long=True) # call class method
+            long_trades, counter_l, w_c_l, l_c_l = long_book.organise_positions(long_to_open, 
+                                                                long_to_close, 
+                                                                i, 
+                                                                fx_data, 
+                                                                long=True) # call class method
             
-            if len(long_to_close) != 0: # ensuring trades are occuring, before storing
+            short_trades, counter_s, w_c_s, l_c_s = short_book.organise_positions(short_to_open, 
+                                                                short_to_close, 
+                                                                i, 
+                                                                fx_data, 
+                                                                long=False)
+            
+            trades_book_l.store_result(long_trades)
+            trades_book_s.store_result(short_trades)
+            
+            # if len(long_to_close) != 0: # ensuring trades are occuring, before storing
                 
-            
-                trades_book.append(averge_win_loss_0/len(long_to_close))
+            #     trades_book.append(averge_win_loss_0/len(long_to_close))
         
-        parameter_tuple = ()  # input strategy parameters, so it can be appended to the below list
-        strategy_parameters.store_result()
-        metric_one.store_result() 
-        
+trades_long = trades_book_l.results
+trades_short = trades_book_s.results
+
+eq_l, avg_rt_l, w_trades_l, l_trades_l, n_trades_l, win_rate_l = trades_book_l.organise_trade_results()
+
+eq_s, avg_rt_s, w_trades_s, l_trades_s, n_trades_s, win_rate_s = trades_book_s.organise_trade_results()
+
+
+'''
+continuation notes,
+many issues have been debugged. 
+
+Need to formalise a metric store for a trading strategy parameter combination.
+Hence, we can then identify the optimal trading metrics.
+
+Proof checking of the strategy and classes needs to be performed. specifically the
+correct closing and opening of positions. 
+'''     
