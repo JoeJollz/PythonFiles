@@ -12,6 +12,15 @@ for the variables 'long_to_close', 'short_to_close', 'long_pairs', and
 based on best performing pairs, or worst performing pairs. 
 """
 
+'''
+Currently re working the indexing for the backtesting, DateTime based, rather than
+simple loop. Need to reconsider approach.
+Consider 
+- how to extract a datetime from our current data set, which we can loop over.
+- raise expections for missing data at specific dates (e.g. weekends).
+Messy code, needs cleaning up with additional comments added. 
+'''
+
 import pandas as pd
 import numpy as np
 import yfinance as yf
@@ -97,15 +106,15 @@ class PositionBook:
         is for long positions of short position. It will consider what
         positions will be closed and therefore caculate their relavent profit
         or loss. It will then remove the positions from our order book, and 
-        then added the new positions which are to opened. It will store the 
-        FX_pair name as the key, with the price action at the point of opening 
-        the position being the value. 
+        then added the new positions which are to opened, with their price action.
+        It will store the FX_pair name as the key, with the price action at the
+        point of opening the position being the value. 
         
         It will then return the average win / loss for all the positions opened
         and closed. 
         
         This method must be called seperately the long positions order book, 
-        and the short positions order book. 
+        and the short positions order book.   ??? 
 
         Parameters
         ----------
@@ -141,7 +150,7 @@ class PositionBook:
         
         for _ in to_close:
             open_price = book[_]
-            close_price = fx_data[_]['Close'].iloc[index]
+            close_price = fx_data[_]['Close'].loc[index]
             del book[_] # removing the FX pair from our position book
             
             if long == True:
@@ -160,7 +169,7 @@ class PositionBook:
         trade_counter = len(to_close)
         
         for _ in to_open:
-            book[_] = fx_data[_]['Close'].iloc[index] # storing the new price of the newly opened poistion
+            book[_] = fx_data[_]['Close'].loc[index] # storing the new price of the newly opened poistion
             
     
         return trades, trade_counter, w_trades, l_trades
@@ -254,6 +263,8 @@ formatted_pairs = format_pairs(currency_pairs)
 start_date = '2010-01-01'
 end_date = '2020-12-31'
 
+#date_range = pd.date_range(start_date,end_date)
+
 # fetching the data from YF #
 def fetch_data(pairs, start_date, end_date):
     
@@ -265,6 +276,10 @@ def fetch_data(pairs, start_date, end_date):
         
         if not data.empty:
             forex_data[pair] = data
+        
+        #forex_data[pair].index = forex_data[pair].index.normalize()
+    
+        data.index = data.index.tz_localize(None)    
     
     return forex_data
 
@@ -306,7 +321,11 @@ holding_periods = [2,3, 5, 10, 15]
 
 min_rows = min(df.shape[0] for df in fx_data.values()) # identify the maximum size of loop
 
+
+
 for lookback in lookback_periods:
+    date_range = fx_data["AUDCAD=X"].index[lookback:]
+    
     for holding_period in holding_periods:
         
         long_pairs = StringStorage()
@@ -317,14 +336,36 @@ for lookback in lookback_periods:
         trades_book_l = results_store()
         trades_book_s = results_store()
         
-        for i in np.arange(lookback, min_rows, holding_period):
+        #date_range = pd.date_range(start=start_date, end=end_date, freq=f'{holding_period}D')
+        
+        for current_date in date_range: # need to consider how holding period will be taken in to account.
+            lookback_date = current_date - pd.Timedelta(days=lookback)
+            #lookback_date = lookback_date.normalize()
+            #current_date = current_date.normalize()
+        #for i in np.arange(lookback, min_rows, holding_period):
             pct_changes = {}
-            i = int(i)
-            for pair, data in fx_data.items():    
-                data = data['Close']
-                pct_change = data.iloc[i]/ data.iloc[i-lookback] # increase/decrease
+            #i = int(i)
+            for pair, data in fx_data.items(): 
                 
-                pct_changes[pair] = pct_change
+                if current_date and lookback_date in data['Close'].index:
+                    print('problem pair', pair, ' Date issues could be: ', current_date, lookback_date)
+                    close_price = data['Close'].loc[current_date]
+                
+                else:
+                    print(f"Date {current_date} not found in the index for {pair}.")
+                    close_price = None  # Handle as appropriate
+                
+                if current_date in data.index and lookback_date in data.index:
+                    print('success', pair)
+                    #data.index = data.index.normalize()
+                    data = data['Close']
+                    
+                    pct_change = data.loc[current_date] / data.loc[lookback_date]
+                    #pct_change = data.iloc[i]/ data.iloc[i-lookback] # increase/decrease
+                    
+                    pct_changes[pair] = pct_change
+                else:
+                    print(f"Missing data for {pair} on {current_date} or {lookback_date}")
                 
             sorted_pct_changes = sorted(pct_changes.items(), key=itemgetter(1)) # sort the pairs, from worst (top) to best (bottom)
             
@@ -339,13 +380,13 @@ for lookback in lookback_periods:
             
             long_trades, counter_l, w_c_l, l_c_l = long_book.organise_positions(long_to_open, 
                                                                 long_to_close, 
-                                                                i, 
+                                                                current_date, 
                                                                 fx_data, 
                                                                 long=True) # call class method
             
             short_trades, counter_s, w_c_s, l_c_s = short_book.organise_positions(short_to_open, 
                                                                 short_to_close, 
-                                                                i, 
+                                                                current_date, 
                                                                 fx_data, 
                                                                 long=False)
             
